@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <title>Snake Game</title>
     <style>
         * {
@@ -248,7 +249,7 @@
         let score = 0;
         let highScore = localStorage.getItem('snakeHighScore') || 0;
         let gameRunning = false;
-        let gameStarted = false; // NEW: tracks if player has pressed a direction
+        let gameStarted = false;
         let gameLoop = null;
 
         const scoreDisplay = document.getElementById('score');
@@ -261,13 +262,129 @@
 
         highScoreDisplay.textContent = highScore;
 
+        // ========== DRAW SNAKE AS A REAL SNAKE ==========
+        function drawSnake() {
+            const segmentSize = gridSize - 2;
+            const centerOffset = 1;
+
+            snake.forEach((segment, index) => {
+                const x = segment.x * gridSize + centerOffset;
+                const y = segment.y * gridSize + centerOffset;
+                const centerX = x + segmentSize / 2;
+                const centerY = y + segmentSize / 2;
+
+                if (index === 0) {
+                    // ===== HEAD =====
+                    // Head is slightly larger and oval-shaped
+                    ctx.fillStyle = '#2ecc71';
+                    ctx.shadowColor = '#2ecc71';
+                    ctx.shadowBlur = 15;
+
+                    // Draw oval head
+                    ctx.beginPath();
+                    ctx.ellipse(centerX, centerY, segmentSize / 2 + 1, segmentSize / 2 + 1, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Eyes based on direction
+                    ctx.fillStyle = 'white';
+                    ctx.shadowBlur = 0;
+                    let eyeOffsetX = 0, eyeOffsetY = 0;
+
+                    if (velocity.x === 1) { eyeOffsetX = 3; eyeOffsetY = -3; }      // Right
+                    else if (velocity.x === -1) { eyeOffsetX = -3; eyeOffsetY = -3; } // Left
+                    else if (velocity.y === -1) { eyeOffsetX = -3; eyeOffsetY = -3; } // Up
+                    else if (velocity.y === 1) { eyeOffsetX = -3; eyeOffsetY = 3; }   // Down
+                    else { eyeOffsetX = 3; eyeOffsetY = -3; } // Default (right)
+
+                    // Left eye
+                    ctx.beginPath();
+                    ctx.arc(centerX + eyeOffsetX - 2, centerY + eyeOffsetY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Right eye
+                    ctx.beginPath();
+                    ctx.arc(centerX + eyeOffsetX + 4, centerY + eyeOffsetY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Pupils
+                    ctx.fillStyle = 'black';
+                    ctx.beginPath();
+                    ctx.arc(centerX + eyeOffsetX - 2, centerY + eyeOffsetY, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(centerX + eyeOffsetX + 4, centerY + eyeOffsetY, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Tongue (only when moving)
+                    if (gameStarted) {
+                        ctx.strokeStyle = '#e74c3c';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        let tongueX = centerX;
+                        let tongueY = centerY;
+
+                        if (velocity.x === 1) { tongueX += segmentSize / 2 + 3; }
+                        else if (velocity.x === -1) { tongueX -= segmentSize / 2 + 3; }
+                        else if (velocity.y === -1) { tongueY -= segmentSize / 2 + 3; }
+                        else if (velocity.y === 1) { tongueY += segmentSize / 2 + 3; }
+
+                        ctx.moveTo(centerX, centerY);
+                        ctx.lineTo(tongueX, tongueY);
+                        ctx.stroke();
+
+                        // Tongue tip (forked)
+                        ctx.beginPath();
+                        ctx.moveTo(tongueX, tongueY);
+                        if (velocity.x !== 0) {
+                            ctx.lineTo(tongueX + (velocity.x * 3), tongueY - 3);
+                            ctx.moveTo(tongueX, tongueY);
+                            ctx.lineTo(tongueX + (velocity.x * 3), tongueY + 3);
+                        } else {
+                            ctx.lineTo(tongueX - 3, tongueY + (velocity.y * 3));
+                            ctx.moveTo(tongueX, tongueY);
+                            ctx.lineTo(tongueX + 3, tongueY + (velocity.y * 3));
+                        }
+                        ctx.stroke();
+                    }
+
+                } else {
+                    // ===== BODY =====
+                    // Body segments get progressively smaller toward tail
+                    const sizeMultiplier = 1 - (index / (snake.length + 5)) * 0.3;
+                    const bodySize = (segmentSize / 2) * sizeMultiplier;
+
+                    // Gradient from bright green to dark green
+                    const greenValue = Math.max(39, 100 - index * 8);
+                    ctx.fillStyle = `rgb(46, ${greenValue + 150}, 113)`;
+                    ctx.shadowColor = '#2ecc71';
+                    ctx.shadowBlur = Math.max(0, 10 - index);
+
+                    // Draw rounded body segment
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, bodySize, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Scale pattern (darker spots)
+                    if (index % 2 === 0) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                        ctx.beginPath();
+                        ctx.arc(centerX - 2, centerY - 2, bodySize * 0.4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            });
+            ctx.shadowBlur = 0;
+        }
+
         function draw() {
+            // Clear canvas
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            ctx.strokeStyle = '#1a1a1a';
+            // Draw subtle grid
+            ctx.strokeStyle = '#111';
             ctx.lineWidth = 1;
-            for (let i = 0; i < tileCount; i++) {
+            for (let i = 0; i <= tileCount; i++) {
                 ctx.beginPath();
                 ctx.moveTo(i * gridSize, 0);
                 ctx.lineTo(i * gridSize, canvas.height);
@@ -278,54 +395,60 @@
                 ctx.stroke();
             }
 
-            snake.forEach((segment, index) => {
-                if (index === 0) {
-                    ctx.fillStyle = '#2ecc71';
-                    ctx.shadowColor = '#2ecc71';
-                    ctx.shadowBlur = 10;
-                } else {
-                    ctx.fillStyle = '#27ae60';
-                    ctx.shadowBlur = 0;
-                }
-                ctx.fillRect(
-                    segment.x * gridSize + 1,
-                    segment.y * gridSize + 1,
-                    gridSize - 2,
-                    gridSize - 2
-                );
-            });
-            ctx.shadowBlur = 0;
+            // Draw food as a shiny apple
+            const foodX = food.x * gridSize + gridSize / 2;
+            const foodY = food.y * gridSize + gridSize / 2;
 
-            ctx.fillStyle = '#e74c3c';
+            // Apple glow
             ctx.shadowColor = '#e74c3c';
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 20;
+
+            // Apple body
+            ctx.fillStyle = '#e74c3c';
             ctx.beginPath();
-            ctx.arc(
-                food.x * gridSize + gridSize / 2,
-                food.y * gridSize + gridSize / 2,
-                gridSize / 2 - 2,
-                0,
-                Math.PI * 2
-            );
+            ctx.arc(foodX, foodY + 2, gridSize / 2 - 3, 0, Math.PI * 2);
             ctx.fill();
+
+            // Apple shine
             ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.arc(foodX - 3, foodY - 2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Apple stem
+            ctx.strokeStyle = '#27ae60';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(foodX, foodY - 5);
+            ctx.lineTo(foodX + 2, foodY - 10);
+            ctx.stroke();
+
+            // Apple leaf
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.ellipse(foodX + 4, foodY - 9, 4, 2, Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw the snake
+            drawSnake();
         }
 
         function update() {
             if (!gameRunning) return;
-
-            // Only move if player has chosen a direction
             if (!gameStarted) return;
 
             velocity = { ...nextVelocity };
 
             const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
 
+            // Wall collision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
                 gameOver();
                 return;
             }
 
+            // Self collision
             for (let segment of snake) {
                 if (head.x === segment.x && head.y === segment.y) {
                     gameOver();
@@ -335,6 +458,7 @@
 
             snake.unshift(head);
 
+            // Eat food
             if (head.x === food.x && head.y === food.y) {
                 score++;
                 scoreDisplay.textContent = score;
@@ -387,7 +511,7 @@
             placeFood();
 
             gameRunning = true;
-            gameStarted = false; // Wait for direction input
+            gameStarted = false;
             gameOverDiv.classList.remove('show');
             startBtn.textContent = '⏸️ Playing...';
             startBtn.disabled = true;
@@ -400,7 +524,6 @@
         }
 
         function setDirection(newVelocity) {
-            // Only allow direction change if game is running
             if (!gameRunning) return;
 
             // Prevent reversing directly
@@ -409,7 +532,6 @@
 
             nextVelocity = newVelocity;
 
-            // First direction press starts the movement
             if (!gameStarted) {
                 gameStarted = true;
                 startHint.style.display = 'none';
@@ -463,6 +585,7 @@
             startGame();
         });
 
+        // Initial draw
         draw();
     </script>
 </body>
