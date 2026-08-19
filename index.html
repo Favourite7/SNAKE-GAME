@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Snake Game</title>
     <style>
-        /* ========== CSS ========== */
         * {
             margin: 0;
             padding: 0;
@@ -39,7 +38,6 @@
             font-size: 0.9rem;
         }
 
-        /* Stats */
         .stats {
             display: flex;
             justify-content: center;
@@ -66,7 +64,6 @@
         #score { color: #2ecc71; }
         #high-score { color: #f39c12; }
 
-        /* Game Canvas */
         canvas {
             border: 3px solid #2ecc71;
             border-radius: 10px;
@@ -76,7 +73,6 @@
             margin: 0 auto 15px;
         }
 
-        /* Controls hint */
         .controls {
             color: #888;
             font-size: 0.85rem;
@@ -90,7 +86,6 @@
             margin: 0 2px;
         }
 
-        /* Buttons */
         .btn {
             padding: 12px 30px;
             font-size: 1rem;
@@ -108,7 +103,12 @@
             opacity: 0.9;
         }
 
-        /* Mobile controls */
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .mobile-controls {
             display: none;
             margin-top: 15px;
@@ -139,7 +139,6 @@
             background: rgba(46, 204, 113, 0.4);
         }
 
-        /* Game Over Overlay */
         .game-over {
             display: none;
             position: absolute;
@@ -168,7 +167,18 @@
             font-size: 1.1rem;
         }
 
-        /* Responsive */
+        .start-hint {
+            color: #2ecc71;
+            font-size: 1rem;
+            margin-top: 10px;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
         @media (max-width: 450px) {
             canvas {
                 width: 90vw;
@@ -184,7 +194,6 @@
     </style>
 </head>
 <body>
-    <!-- ========== HTML ========== -->
     <div class="game-container">
         <h1>🐍 Snake Game</h1>
         <p class="subtitle">Eat the food, grow longer, don't crash!</p>
@@ -204,7 +213,6 @@
 
         <p class="controls">Use <span>↑</span> <span>↓</span> <span>←</span> <span>→</span> or <span>W</span> <span>A</span> <span>S</span> <span>D</span> to move</p>
 
-        <!-- Mobile Controls -->
         <div class="mobile-controls">
             <div class="mobile-row">
                 <button class="mobile-btn" id="btn-up">↑</button>
@@ -217,8 +225,8 @@
         </div>
 
         <button class="btn" id="start-btn">▶️ Start Game</button>
+        <p class="start-hint" id="start-hint" style="display: none;">👆 Tap a direction arrow to begin!</p>
 
-        <!-- Game Over Overlay -->
         <div class="game-over" id="game-over">
             <h2>💥 Game Over!</h2>
             <p>Score: <span id="final-score">0</span></p>
@@ -226,46 +234,37 @@
         </div>
     </div>
 
-    <!-- ========== JAVASCRIPT ========== -->
     <script>
-        // ========== GAME SETUP ==========
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Grid settings
-        const gridSize = 20;      // Size of each square
-        const tileCount = 20;     // 20x20 grid (400px / 20px)
+        const gridSize = 20;
+        const tileCount = 20;
 
-        // Game state
-        let snake = [{ x: 10, y: 10 }];  // Snake starts in middle
-        let food = { x: 15, y: 15 };      // Food position
-        let velocity = { x: 0, y: 0 };    // Current direction
-        let nextVelocity = { x: 0, y: 0 }; // Next direction (prevents quick double-taps)
+        let snake = [{ x: 10, y: 10 }];
+        let food = { x: 15, y: 15 };
+        let velocity = { x: 0, y: 0 };
+        let nextVelocity = { x: 0, y: 0 };
         let score = 0;
         let highScore = localStorage.getItem('snakeHighScore') || 0;
         let gameRunning = false;
+        let gameStarted = false; // NEW: tracks if player has pressed a direction
         let gameLoop = null;
 
-        // DOM elements
         const scoreDisplay = document.getElementById('score');
         const highScoreDisplay = document.getElementById('high-score');
         const startBtn = document.getElementById('start-btn');
         const restartBtn = document.getElementById('restart-btn');
         const gameOverDiv = document.getElementById('game-over');
         const finalScoreSpan = document.getElementById('final-score');
+        const startHint = document.getElementById('start-hint');
 
-        // Show high score
         highScoreDisplay.textContent = highScore;
 
-        // ========== DRAWING FUNCTIONS ==========
-
-        // Draw the game
         function draw() {
-            // Clear canvas
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw grid lines (subtle)
             ctx.strokeStyle = '#1a1a1a';
             ctx.lineWidth = 1;
             for (let i = 0; i < tileCount; i++) {
@@ -279,15 +278,12 @@
                 ctx.stroke();
             }
 
-            // Draw snake
             snake.forEach((segment, index) => {
                 if (index === 0) {
-                    // Head - brighter green
                     ctx.fillStyle = '#2ecc71';
                     ctx.shadowColor = '#2ecc71';
                     ctx.shadowBlur = 10;
                 } else {
-                    // Body - darker green
                     ctx.fillStyle = '#27ae60';
                     ctx.shadowBlur = 0;
                 }
@@ -298,9 +294,8 @@
                     gridSize - 2
                 );
             });
-            ctx.shadowBlur = 0; // Reset shadow
+            ctx.shadowBlur = 0;
 
-            // Draw food
             ctx.fillStyle = '#e74c3c';
             ctx.shadowColor = '#e74c3c';
             ctx.shadowBlur = 15;
@@ -316,25 +311,21 @@
             ctx.shadowBlur = 0;
         }
 
-        // ========== GAME LOGIC ==========
-
-        // Update game state
         function update() {
             if (!gameRunning) return;
 
-            // Apply next velocity
+            // Only move if player has chosen a direction
+            if (!gameStarted) return;
+
             velocity = { ...nextVelocity };
 
-            // Calculate new head position
             const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
 
-            // Check wall collision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
                 gameOver();
                 return;
             }
 
-            // Check self collision
             for (let segment of snake) {
                 if (head.x === segment.x && head.y === segment.y) {
                     gameOver();
@@ -342,21 +333,17 @@
                 }
             }
 
-            // Add new head
             snake.unshift(head);
 
-            // Check food collision
             if (head.x === food.x && head.y === food.y) {
                 score++;
                 scoreDisplay.textContent = score;
                 placeFood();
             } else {
-                // Remove tail if no food eaten
                 snake.pop();
             }
         }
 
-        // Place food randomly (not on snake)
         function placeFood() {
             let validPosition = false;
             while (!validPosition) {
@@ -364,7 +351,6 @@
                 food.y = Math.floor(Math.random() * tileCount);
 
                 validPosition = true;
-                // Make sure food doesn't spawn on snake
                 for (let segment of snake) {
                     if (segment.x === food.x && segment.y === food.y) {
                         validPosition = false;
@@ -374,12 +360,11 @@
             }
         }
 
-        // Game Over
         function gameOver() {
             gameRunning = false;
+            gameStarted = false;
             clearInterval(gameLoop);
 
-            // Update high score
             if (score > highScore) {
                 highScore = score;
                 localStorage.setItem('snakeHighScore', highScore);
@@ -388,11 +373,12 @@
 
             finalScoreSpan.textContent = score;
             gameOverDiv.classList.add('show');
+            startBtn.textContent = '▶️ Start Game';
+            startBtn.disabled = false;
+            startHint.style.display = 'none';
         }
 
-        // Start game
         function startGame() {
-            // Reset state
             snake = [{ x: 10, y: 10 }];
             velocity = { x: 0, y: 0 };
             nextVelocity = { x: 0, y: 0 };
@@ -401,75 +387,71 @@
             placeFood();
 
             gameRunning = true;
+            gameStarted = false; // Wait for direction input
             gameOverDiv.classList.remove('show');
-            startBtn.textContent = '⏸️ Pause';
+            startBtn.textContent = '⏸️ Playing...';
+            startBtn.disabled = true;
+            startHint.style.display = 'block';
 
-            // Game loop: update 10 times per second
             gameLoop = setInterval(() => {
                 update();
                 draw();
             }, 100);
         }
 
-        // ========== CONTROLS ==========
+        function setDirection(newVelocity) {
+            // Only allow direction change if game is running
+            if (!gameRunning) return;
+
+            // Prevent reversing directly
+            if (newVelocity.x !== 0 && velocity.x === -newVelocity.x) return;
+            if (newVelocity.y !== 0 && velocity.y === -newVelocity.y) return;
+
+            nextVelocity = newVelocity;
+
+            // First direction press starts the movement
+            if (!gameStarted) {
+                gameStarted = true;
+                startHint.style.display = 'none';
+            }
+        }
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
-            if (!gameRunning && e.key !== ' ') return;
-
             switch(e.key) {
                 case 'ArrowUp':
                 case 'w':
                 case 'W':
-                    if (velocity.y !== 1) { // Can't go down if going up
-                        nextVelocity = { x: 0, y: -1 };
-                    }
+                    e.preventDefault();
+                    setDirection({ x: 0, y: -1 });
                     break;
                 case 'ArrowDown':
                 case 's':
                 case 'S':
-                    if (velocity.y !== -1) {
-                        nextVelocity = { x: 0, y: 1 };
-                    }
+                    e.preventDefault();
+                    setDirection({ x: 0, y: 1 });
                     break;
                 case 'ArrowLeft':
                 case 'a':
                 case 'A':
-                    if (velocity.x !== 1) {
-                        nextVelocity = { x: -1, y: 0 };
-                    }
+                    e.preventDefault();
+                    setDirection({ x: -1, y: 0 });
                     break;
                 case 'ArrowRight':
                 case 'd':
                 case 'D':
-                    if (velocity.x !== -1) {
-                        nextVelocity = { x: 1, y: 0 };
-                    }
-                    break;
-                case ' ':
                     e.preventDefault();
-                    if (!gameRunning && !gameOverDiv.classList.contains('show')) {
-                        startGame();
-                    }
+                    setDirection({ x: 1, y: 0 });
                     break;
             }
         });
 
         // Mobile controls
-        document.getElementById('btn-up').addEventListener('click', () => {
-            if (velocity.y !== 1) nextVelocity = { x: 0, y: -1 };
-        });
-        document.getElementById('btn-down').addEventListener('click', () => {
-            if (velocity.y !== -1) nextVelocity = { x: 0, y: 1 };
-        });
-        document.getElementById('btn-left').addEventListener('click', () => {
-            if (velocity.x !== 1) nextVelocity = { x: -1, y: 0 };
-        });
-        document.getElementById('btn-right').addEventListener('click', () => {
-            if (velocity.x !== -1) nextVelocity = { x: 1, y: 0 };
-        });
+        document.getElementById('btn-up').addEventListener('click', () => setDirection({ x: 0, y: -1 }));
+        document.getElementById('btn-down').addEventListener('click', () => setDirection({ x: 0, y: 1 }));
+        document.getElementById('btn-left').addEventListener('click', () => setDirection({ x: -1, y: 0 }));
+        document.getElementById('btn-right').addEventListener('click', () => setDirection({ x: 1, y: 0 }));
 
-        // Button events
         startBtn.addEventListener('click', () => {
             if (!gameRunning) {
                 startGame();
@@ -481,7 +463,6 @@
             startGame();
         });
 
-        // Initial draw
         draw();
     </script>
 </body>
